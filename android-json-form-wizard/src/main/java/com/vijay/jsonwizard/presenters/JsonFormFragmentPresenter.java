@@ -41,6 +41,7 @@ import android.widget.TextView;
 import com.rengwuxian.materialedittext.MaterialEditText;
 import com.rengwuxian.materialedittext.validation.METValidator;
 import com.rey.material.widget.Button;
+import io.github.softmedtanzania.MaskedEditText;
 import com.vijay.jsonwizard.R;
 import com.vijay.jsonwizard.activities.JsonFormActivity;
 import com.vijay.jsonwizard.adapter.DynamicLabelAdapter;
@@ -68,6 +69,8 @@ import com.vijay.jsonwizard.widgets.CountDownTimerFactory;
 import com.vijay.jsonwizard.widgets.EditTextFactory;
 import com.vijay.jsonwizard.widgets.GpsFactory;
 import com.vijay.jsonwizard.widgets.ImagePickerFactory;
+import com.vijay.jsonwizard.widgets.MaskEditTextFactory;
+import com.vijay.jsonwizard.widgets.MaskEditTextFactory;
 import com.vijay.jsonwizard.widgets.MultiSelectListFactory;
 import com.vijay.jsonwizard.widgets.NativeEditTextFactory;
 import com.vijay.jsonwizard.widgets.NativeRadioButtonFactory;
@@ -152,7 +155,16 @@ public class JsonFormFragmentPresenter extends
                 }
                 return validationStatus;
             }
-        } else if (childAt instanceof MaterialEditText) {
+        } else if (childAt instanceof MaskedEditText) {
+            MaskedEditText editText = (MaskedEditText) childAt;
+            ValidationStatus validationStatus = MaskEditTextFactory.validate(formFragmentView, editText);
+            if (!validationStatus.isValid()) {
+                if (requestFocus) {
+                    validationStatus.requestAttention();
+                }
+                return validationStatus;
+            }
+        }  else if (childAt instanceof MaterialEditText) {
             MaterialEditText editText = (MaterialEditText) childAt;
             ValidationStatus validationStatus = EditTextFactory.validate(formFragmentView, editText);
             if (!validationStatus.isValid()) {
@@ -561,9 +573,9 @@ public class JsonFormFragmentPresenter extends
         boolean isSkipped = false;
         final String nextStep = getFormFragment().getJsonApi().nextStep();
         if (StringUtils.isNotBlank(nextStep)) {
+            cleanDataForNextStep();
             getmJsonFormInteractor().fetchFormElements(nextStep, getFormFragment(), getFormFragment().getJsonApi().getmJSONObject().optJSONObject(nextStep), getView().getCommonListener(), false);
             getFormFragment().getJsonApi().initializeDependencyMaps();
-            cleanDataForNextStep();
             getFormFragment().getJsonApi().invokeRefreshLogic(null, false, null, null, nextStep, true);
             if (!getFormFragment().getJsonApi().isNextStepRelevant()) {
                 Utils.checkIfStepHasNoSkipLogic(getFormFragment());

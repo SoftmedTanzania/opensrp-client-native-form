@@ -25,6 +25,8 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 
+import timber.log.Timber;
+
 public class HiddenTextFactory implements FormWidgetFactory {
 
     @Override
@@ -95,7 +97,11 @@ public class HiddenTextFactory implements FormWidgetFactory {
             formFragment.getJsonApi().getAppExecutors().mainThread().execute(new Runnable() {
                 @Override
                 public void run() {
-                    hiddenText.setText(value);
+                    try {
+                        hiddenText.setText(value);
+                    }catch (Exception e){
+                        Timber.e(e);
+                    }
                 }
             });
         }

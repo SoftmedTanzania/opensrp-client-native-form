@@ -15,6 +15,7 @@ import org.smartregister.client.utils.contract.ClientFormContract;
 
 import java.util.Collection;
 import java.util.Map;
+import java.util.concurrent.CountDownLatch;
 
 /**
  * Created by vijay on 5/16/15.
@@ -144,4 +145,8 @@ public interface JsonApi extends ClientFormContract.View {
     String nextStep();
 
     void setNextStep(String nextStep);
+
+    void setCountDownLatch(CountDownLatch countDownLatch);
+
+    CountDownLatch getCountDownLatch();
 }

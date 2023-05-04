@@ -4,6 +4,8 @@ import android.content.Context;
 import android.graphics.Color;
 import androidx.annotation.NonNull;
 import androidx.annotation.VisibleForTesting;
+
+import android.text.Html;
 import android.text.TextUtils;
 import android.view.LayoutInflater;
 import android.view.View;
@@ -134,7 +136,7 @@ public class ToasterNotesFactory implements FormWidgetFactory {
             default:
                 break;
         }
-        toasterNotesTextView.setText(text);
+        toasterNotesTextView.setText(Html.fromHtml(text));
         linearLayout.setTag(R.id.original_text, text);
         toasterNotesTextView.setTextColor(Color.parseColor(textColor));
 

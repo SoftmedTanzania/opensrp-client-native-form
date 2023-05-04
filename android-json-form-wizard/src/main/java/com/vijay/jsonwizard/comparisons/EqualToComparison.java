@@ -4,6 +4,7 @@ import android.util.Log;
 
 import com.vijay.jsonwizard.utils.Utils;
 import com.vijay.jsonwizard.widgets.DatePickerFactory;
+import com.vijay.jsonwizard.widgets.TimePickerFactory;
 
 import org.json.JSONArray;
 import org.json.JSONException;
@@ -42,6 +43,16 @@ public class EqualToComparison extends Comparison {
                     Date dateA = DatePickerFactory.DATE_FORMAT.parse(Utils.getDateFormattedForCalculation(a,  Form.getDatePickerDisplayFormat()));
                     Date dateB = DatePickerFactory.DATE_FORMAT.parse(b);
                     return dateA.getTime() == dateB.getTime();
+                case TYPE_TIME:
+                    if (a == null) {
+                        a = DEFAULT_TIME;
+                    }
+                    if (b == null) {
+                        b = DEFAULT_TIME;
+                    }
+                    Date timeA = TimePickerFactory.TIME_FORMAT.parse(a);
+                    Date timeB = TimePickerFactory.TIME_FORMAT.parse(b);
+                    return timeA.getTime() == timeB.getTime();
                 case TYPE_ARRAY:
                     if (a == null) {
                         a = DEFAULT_ARRAY;

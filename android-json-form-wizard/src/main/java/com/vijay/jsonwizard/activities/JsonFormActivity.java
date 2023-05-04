@@ -103,6 +103,8 @@ import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentSkipListSet;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.TimeUnit;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -110,6 +112,7 @@ import timber.log.Timber;
 
 public class JsonFormActivity extends JsonFormBaseActivity implements JsonApi {
 
+    private CountDownLatch latch;
     private final FormUtils formUtils = new FormUtils();
     private final Map<String, JSONObject> formFields = new ConcurrentHashMap<>();
     private final Set<String> popupFormFields = new ConcurrentSkipListSet<>();
@@ -126,12 +129,10 @@ public class JsonFormActivity extends JsonFormBaseActivity implements JsonApi {
         public void onReceive(Context context, Intent intent) {
             String messageType = intent.getStringExtra(JsonFormConstants.INTENT_KEY.MESSAGE_TYPE);
             if (JsonFormConstants.MESSAGE_TYPE.GLOBAL_VALUES.equals(messageType)) {
-                Map<String, String> map =
-                        (Map<String, String>) intent.getSerializableExtra(JsonFormConstants.INTENT_KEY.MESSAGE);
+                Map<String, String> map = (Map<String, String>) intent.getSerializableExtra(JsonFormConstants.INTENT_KEY.MESSAGE);
                 globalValues.putAll(map);
                 String stepName = intent.getStringExtra(JsonFormConstants.STEPNAME);
-                if (StringUtils.isNotBlank(stepName))
-                    performActionOnReceived(stepName);
+                if (StringUtils.isNotBlank(stepName)) performActionOnReceived(stepName);
             }
         }
     };
@@ -312,6 +313,16 @@ public class JsonFormActivity extends JsonFormBaseActivity implements JsonApi {
         initComparisons();
         Set<String> viewsIds = skipLogicDependencyMap.get(stepName + "_" + parentKey);
         if (parentKey == null || childKey == null) {
+            try {
+                if (latch != null && latch.getCount() > 0 && skipBlankSteps()) {
+                    //Necessary to ensure that if there are any concurrent threads updating the skipLogicViews ConcurrentHashMap, the map is update before continuing
+                    //NOTE: Without this skipLogicViews might be empty sometime while values are being updated on the UI thread, this is an issue when skip_blank_test is set to true
+                    latch.await(300, TimeUnit.MILLISECONDS);
+                    Thread.sleep(300);
+                }
+            } catch (Exception e) {
+                Timber.e(e);
+            }
             for (View curView : skipLogicViews.values()) {
                 if (isForNextStep && isNextStepRelevant()) {
                     break;
@@ -372,7 +383,7 @@ public class JsonFormActivity extends JsonFormBaseActivity implements JsonApi {
 
     @Override
     public void refreshCalculationLogic(String parentKey, String childKey, boolean popup, String stepName, boolean isForNextStep) {
-        appExecutors.diskIO().execute(() ->{
+        appExecutors.diskIO().execute(() -> {
             Set<String> viewsIds = calculationDependencyMap.get(stepName + "_" + parentKey);
             if (parentKey == null || viewsIds == null)
                 viewsIds = calculationLogicViews.keySet();
@@ -629,7 +640,7 @@ public class JsonFormActivity extends JsonFormBaseActivity implements JsonApi {
      */
     @Override
     public void refreshConstraints(String parentKey, String childKey, boolean popup) {
-        appExecutors.diskIO().execute(()->{
+        appExecutors.diskIO().execute(() -> {
             initComparisons();
 
             // Priorities constraints on the view that has just been changed
@@ -1037,41 +1048,44 @@ public class JsonFormActivity extends JsonFormBaseActivity implements JsonApi {
 
         synchronized (getmJSONObject()) {
             JSONObject checkboxObject = formFields.get(stepName + "_" + parentKey);
-            JSONArray checkboxOptions = checkboxObject.getJSONArray(childObjectKey);
-            HashSet<String> currentValues = new HashSet<>();
-            //Get current values
-            if (checkboxObject.has(JsonFormConstants.VALUE)) {
-                formUtils.updateValueToJSONArray(checkboxObject, checkboxObject.optString(JsonFormConstants.VALUE, ""));
-            }
 
-            if (checkboxObject != null && checkboxOptions != null) {
-                if (checkboxObject.has(JsonFormConstants.VALUE) && StringUtils.isNotEmpty(checkboxObject.getString(JsonFormConstants.VALUE))) {
-                    currentValues.addAll(getCurrentCheckboxValues(checkboxObject.getJSONArray(JsonFormConstants.VALUE)));
+            if(checkboxObject != null) {
+                JSONArray checkboxOptions = checkboxObject.getJSONArray(childObjectKey);
+                HashSet<String> currentValues = new HashSet<>();
+                //Get current values
+                if (checkboxObject.has(JsonFormConstants.VALUE)) {
+                    formUtils.updateValueToJSONArray(checkboxObject, checkboxObject.optString(JsonFormConstants.VALUE, ""));
                 }
 
-                for (int index = 0; index < checkboxOptions.length(); index++) {
-                    JSONObject option = checkboxOptions.getJSONObject(index);
-                    if (option.has(JsonFormConstants.KEY) &&
-                            childKey.equals(option.getString(JsonFormConstants.KEY))) {
-                        option.put(JsonFormConstants.VALUE, Boolean.parseBoolean(value));
-                        if (Boolean.parseBoolean(value)) {
-                            if (Utils.enabledProperty(NativeFormsProperties.KEY.WIDGET_VALUE_TRANSLATED)) {
-                                JSONObject object = Utils.generateTranslatableValue(childKey, option);
-                                currentValues.add(object.toString());
+                if (checkboxOptions != null) {
+                    if (checkboxObject.has(JsonFormConstants.VALUE) && StringUtils.isNotEmpty(checkboxObject.getString(JsonFormConstants.VALUE))) {
+                        currentValues.addAll(getCurrentCheckboxValues(checkboxObject.getJSONArray(JsonFormConstants.VALUE)));
+                    }
+
+                    for (int index = 0; index < checkboxOptions.length(); index++) {
+                        JSONObject option = checkboxOptions.getJSONObject(index);
+                        if (option.has(JsonFormConstants.KEY) &&
+                                childKey.equals(option.getString(JsonFormConstants.KEY))) {
+                            option.put(JsonFormConstants.VALUE, Boolean.parseBoolean(value));
+                            if (Boolean.parseBoolean(value)) {
+                                if (Utils.enabledProperty(NativeFormsProperties.KEY.WIDGET_VALUE_TRANSLATED)) {
+                                    JSONObject object = Utils.generateTranslatableValue(childKey, option);
+                                    currentValues.add(object.toString());
+                                } else {
+                                    currentValues.add(childKey);
+                                }
                             } else {
-                                currentValues.add(childKey);
-                            }
-                        } else {
-                            if (Utils.enabledProperty(NativeFormsProperties.KEY.WIDGET_VALUE_TRANSLATED)) {
-                                JSONObject object = Utils.generateTranslatableValue(childKey, option);
-                                currentValues.remove(object.toString());
-                            } else {
-                                currentValues.remove(childKey);
+                                if (Utils.enabledProperty(NativeFormsProperties.KEY.WIDGET_VALUE_TRANSLATED)) {
+                                    JSONObject object = Utils.generateTranslatableValue(childKey, option);
+                                    currentValues.remove(object.toString());
+                                } else {
+                                    currentValues.remove(childKey);
+                                }
                             }
                         }
                     }
+                    checkboxObject.put(JsonFormConstants.VALUE, getCheckboxValueJsonArray(currentValues));
                 }
-                checkboxObject.put(JsonFormConstants.VALUE, getCheckboxValueJsonArray(currentValues));
             }
             invokeRefreshLogic(value, popup, parentKey, childKey, stepName, false);
         }
@@ -1296,7 +1310,7 @@ public class JsonFormActivity extends JsonFormBaseActivity implements JsonApi {
                     for (int i = 0; i < constraint.length(); i++) {
                         JSONObject curConstraint = constraint.getJSONObject(i);
                         if (address.length == 2) {
-                            String value = String.valueOf(getValueFromAddress(address, popup).get(JsonFormConstants.VALUE));
+                            String value = String.valueOf((Object) getValueFromAddress(address, popup).get(JsonFormConstants.VALUE));
                             errorMessage = enforceConstraint(value, curView, curConstraint);
                             if (errorMessage != null) break;
                         }
@@ -1536,7 +1550,7 @@ public class JsonFormActivity extends JsonFormBaseActivity implements JsonApi {
                         args[i] = valueMatcher.group(1);
                     } else {
                         try {
-                            args[i] = String.valueOf(
+                            args[i] = String.valueOf((Object)
                                     getValueFromAddress(curArg.split(":"), false).get(JsonFormConstants.VALUE));
                         } catch (Exception e) {
                             Timber.e(e, "JsonFormActivity --> getFunctionArgs");
@@ -2530,6 +2544,16 @@ public class JsonFormActivity extends JsonFormBaseActivity implements JsonApi {
     @Override
     public void setNextStep(String nextStep) {
         this.nextStep = nextStep;
+    }
+
+    @Override
+    public void setCountDownLatch(CountDownLatch countDownLatch) {
+        this.latch = countDownLatch;
+    }
+
+    @Override
+    public CountDownLatch getCountDownLatch() {
+        return latch;
     }
 
     @Override

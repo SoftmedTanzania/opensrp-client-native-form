@@ -20,6 +20,7 @@
         android:typeface="normal"
         />
     <View
+        android:id="@+id/separator"
         android:layout_below="@id/btn_multi_select_action"
         android:background="@color/primary_text"
         android:layout_width="match_parent"

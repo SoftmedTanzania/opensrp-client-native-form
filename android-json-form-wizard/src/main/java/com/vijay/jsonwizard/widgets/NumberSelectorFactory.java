@@ -327,7 +327,7 @@ public class NumberSelectorFactory implements FormWidgetFactory {
             }
 
             //Set a tag to the last text view displayed in the number selector widget
-            if (i == (numberOfSelectors - 1) && (numberOfSelectors < maxValue)) {
+            if (i == (numberOfSelectors - 1) && (numberOfSelectors > maxValue - startSelectionNumber + 1)) {
                 customTextView.setTag(R.id.toolbar_parent_layout, linearLayout);
                 customTextView.setTag(R.id.is_number_selector_dialog_textview, true);
                 List<String> numbers = getNumbersForNumberSelectorDialog(jsonObject,

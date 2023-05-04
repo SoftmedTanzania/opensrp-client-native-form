@@ -209,7 +209,7 @@ public class JsonWizardFormFragment extends JsonFormFragment {
 
         if (save || !next) {
             nextButton.setTag(R.id.NEXT_STATE, false);
-            nextButton.setText(getString(R.string.submit));
+            nextButton.setText(getString(R.string.save));
 
             if (form != null && !TextUtils.isEmpty(form.getSaveLabel())) {
                 nextButton.setText(form.getSaveLabel());

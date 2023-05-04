@@ -30,6 +30,7 @@ import com.vijay.jsonwizard.widgets.HorizontalLineFactory;
 import com.vijay.jsonwizard.widgets.ImagePickerFactory;
 import com.vijay.jsonwizard.widgets.ImageViewFactory;
 import com.vijay.jsonwizard.widgets.LabelFactory;
+import com.vijay.jsonwizard.widgets.MaskEditTextFactory;
 import com.vijay.jsonwizard.widgets.MultiSelectListFactory;
 import com.vijay.jsonwizard.widgets.NativeEditTextFactory;
 import com.vijay.jsonwizard.widgets.NativeRadioButtonFactory;
@@ -54,6 +55,7 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.concurrent.CountDownLatch;
 
 import timber.log.Timber;
 
@@ -75,9 +77,7 @@ public class JsonFormInteractor {
         registerWidgets();
         registerDefaultTranslatableFields();
         if (additionalWidgetsMap != null) {
-            for (Map.Entry<String, FormWidgetFactory> widgetFactoryEntry : additionalWidgetsMap.entrySet()) {
-                map.put(widgetFactoryEntry.getKey(), widgetFactoryEntry.getValue());
-            }
+            map.putAll(additionalWidgetsMap);
         }
     }
 
@@ -123,6 +123,7 @@ public class JsonFormInteractor {
         map = new HashMap<>();
         map.put(JsonFormConstants.SECTION_LABEL, new SectionFactory());
         map.put(JsonFormConstants.EDIT_TEXT, new EditTextFactory());
+        map.put(JsonFormConstants.MASK_EDIT_TEXT, new MaskEditTextFactory());
         map.put(JsonFormConstants.HIDDEN, new HiddenTextFactory());
         map.put(JsonFormConstants.LABEL, new LabelFactory());
         map.put(JsonFormConstants.CHECK_BOX, new CheckBoxFactory());
@@ -222,6 +223,13 @@ public class JsonFormInteractor {
 
     private void fetchViews(final List<View> viewsFromJson, final String stepName, final JsonFormFragment formFragment,
                             final String type, final JSONObject jsonObject, final CommonListener listener, final Boolean popup) {
+        if (formFragment.getJsonApi().getCountDownLatch() == null) {
+            formFragment.getJsonApi().setCountDownLatch(new CountDownLatch(1));
+        } else {
+            long count = formFragment.getJsonApi().getCountDownLatch().getCount();
+            count++;
+            formFragment.getJsonApi().setCountDownLatch(new CountDownLatch((int) count));
+        }
         formFragment.getJsonApi().getAppExecutors().mainThread().execute(new Runnable() {
             @Override
             public void run() {
@@ -242,6 +250,12 @@ public class JsonFormInteractor {
                     closeActivityAfterRuntimeException(formFragment, e);
                 } catch (Exception e) {
                     Timber.e(e, "Exception encountered while creating form widget!");
+                }
+
+                //This decrements the latch countdown to zero used in allowing the background thread
+                // to wait for UI thread to finish fetching views and Updating the skipLogicViews
+                if (formFragment.getJsonApi().getCountDownLatch() != null) {
+                    formFragment.getJsonApi().getCountDownLatch().countDown();
                 }
             }
         });

@@ -1,7 +1,8 @@
 package com.vijay.jsonwizard.rules;
 
-import androidx.annotation.NonNull;
 import android.text.TextUtils;
+
+import androidx.annotation.NonNull;
 
 import com.vijay.jsonwizard.domain.Form;
 import com.vijay.jsonwizard.utils.FormUtils;
@@ -15,8 +16,11 @@ import org.joda.time.Months;
 import org.joda.time.Weeks;
 import org.joda.time.Years;
 
+import java.text.ParseException;
+import java.text.SimpleDateFormat;
 import java.util.Calendar;
 import java.util.Date;
+import java.util.Locale;
 import java.util.concurrent.TimeUnit;
 
 /**
@@ -258,7 +262,14 @@ public class RulesEngineDateUtil {
     }
 
     public long getTimeInMillis() {
-        return System.currentTimeMillis();
+        SimpleDateFormat dateFormat = new SimpleDateFormat(
+                FormUtils.NATIIVE_FORM_DATE_FORMAT_PATTERN, Locale.getDefault());
+        try {
+            return dateFormat.parse(getDateToday()).getTime();
+        } catch (ParseException e) {
+            e.printStackTrace();
+        }
+        return Calendar.getInstance().getTimeInMillis();
     }
 
 }
